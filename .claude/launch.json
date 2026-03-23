@@ -1,0 +1,58 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "Serein — iPhone 17 Pro (Simulator)",
+      "runtimeExecutable": "xcodebuild",
+      "runtimeArgs": [
+        "-project", "Serein.xcodeproj",
+        "-scheme", "Serein",
+        "-configuration", "Debug",
+        "-destination", "platform=iOS Simulator,id=0F481AB7-B858-4275-8617-00068EBADA75",
+        "-derivedDataPath", ".build/DerivedData",
+        "build"
+      ],
+      "port": null
+    },
+    {
+      "name": "Serein — iPhone Air (Simulator)",
+      "runtimeExecutable": "xcodebuild",
+      "runtimeArgs": [
+        "-project", "Serein.xcodeproj",
+        "-scheme", "Serein",
+        "-configuration", "Debug",
+        "-destination", "platform=iOS Simulator,id=AC381653-4983-45CF-A089-69C8A7742992",
+        "-derivedDataPath", ".build/DerivedData",
+        "build"
+      ],
+      "port": null
+    },
+    {
+      "name": "Serein — iPad Pro 13-inch M5 (Simulator)",
+      "runtimeExecutable": "xcodebuild",
+      "runtimeArgs": [
+        "-project", "Serein.xcodeproj",
+        "-scheme", "Serein",
+        "-configuration", "Debug",
+        "-destination", "platform=iOS Simulator,id=358E030D-4E39-4BF7-A1FD-6533127FFEA1",
+        "-derivedDataPath", ".build/DerivedData",
+        "build"
+      ],
+      "port": null
+    },
+    {
+      "name": "Serein — SwiftUI Previews (Xcode Canvas)",
+      "runtimeExecutable": "xcodebuild",
+      "runtimeArgs": [
+        "-project", "Serein.xcodeproj",
+        "-scheme", "Serein",
+        "-configuration", "Debug",
+        "-destination", "platform=iOS Simulator,id=0F481AB7-B858-4275-8617-00068EBADA75",
+        "-derivedDataPath", ".build/DerivedData",
+        "build",
+        "ENABLE_PREVIEWS=YES"
+      ],
+      "port": null
+    }
+  ]
+}
