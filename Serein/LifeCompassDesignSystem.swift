@@ -28,9 +28,9 @@ extension Color {
     static let lcPrimary        = Color(lcHex: "#6C7AA6")
 
     // ── Background ───────────────────────────────────────────
-    /// Deep navy — gradient top.
+    /// Deep navy — gradient top (dark mode only; LCBackground adapts in light).
     static let lcBgStart        = Color(lcHex: "#0B0E1A")
-    /// Warm charcoal — gradient bottom.
+    /// Warm charcoal — gradient bottom (dark mode only).
     static let lcBgEnd          = Color(lcHex: "#181B26")
 
     // ── Accents (intentionally desaturated — use opacity layers) ─
@@ -41,18 +41,42 @@ extension Color {
     /// Warm beige.
     static let lcBeige          = Color(lcHex: "#D4C5B0")
 
-    // ── Glass surface layers ──────────────────────────────────
-    /// Translucent white fill — base glass depth.
-    static let lcGlassFill      = Color.white.opacity(0.04)
-    /// Top-edge inner highlight — simulates top light source.
-    static let lcGlassHighlight = Color.white.opacity(0.11)
-    /// Border stroke — restrained, not bright.
-    static let lcGlassStroke    = Color.white.opacity(0.08)
+    // ── Glass surface layers (auto-adaptive) ──────────────────
+    /// Translucent fill — adapts between dark/light.
+    static let lcGlassFill = Color(uiColor: UIColor { tc in
+        tc.userInterfaceStyle == .dark
+            ? UIColor.white.withAlphaComponent(0.04)
+            : UIColor.black.withAlphaComponent(0.035)
+    })
+    /// Top-edge inner highlight — adapts between dark/light.
+    static let lcGlassHighlight = Color(uiColor: UIColor { tc in
+        tc.userInterfaceStyle == .dark
+            ? UIColor.white.withAlphaComponent(0.11)
+            : UIColor.white.withAlphaComponent(0.80)
+    })
+    /// Border stroke — adapts between dark/light.
+    static let lcGlassStroke = Color(uiColor: UIColor { tc in
+        tc.userInterfaceStyle == .dark
+            ? UIColor.white.withAlphaComponent(0.08)
+            : UIColor.black.withAlphaComponent(0.09)
+    })
 
-    // ── Text hierarchy ────────────────────────────────────────
-    static let lcTextPrimary    = Color.white
-    static let lcTextSecondary  = Color.white.opacity(0.50)
-    static let lcTextTertiary   = Color.white.opacity(0.28)
+    // ── Text hierarchy (auto-adaptive) ────────────────────────
+    static let lcTextPrimary = Color(uiColor: UIColor { tc in
+        tc.userInterfaceStyle == .dark
+            ? .white
+            : UIColor(red: 0.08, green: 0.09, blue: 0.14, alpha: 1.0)
+    })
+    static let lcTextSecondary = Color(uiColor: UIColor { tc in
+        tc.userInterfaceStyle == .dark
+            ? UIColor.white.withAlphaComponent(0.50)
+            : UIColor(red: 0.08, green: 0.09, blue: 0.14, alpha: 0.60)
+    })
+    static let lcTextTertiary = Color(uiColor: UIColor { tc in
+        tc.userInterfaceStyle == .dark
+            ? UIColor.white.withAlphaComponent(0.28)
+            : UIColor(red: 0.08, green: 0.09, blue: 0.14, alpha: 0.38)
+    })
 }
 
 // MARK: Hex initialiser
@@ -237,22 +261,30 @@ extension View {
 // ============================================================
 
 /// Reusable full-screen background.
+/// Automatically adapts between dark navy and warm cream palettes.
 /// `showNoise: true` overlays a subtle grain texture for depth.
 struct LCBackground: View {
     var showNoise: Bool = true
+    @Environment(\.colorScheme) private var colorScheme
+
+    // Light mode: warm cream palette
+    private static let lcBgLightStart = Color(lcHex: "#F4F2EE")
+    private static let lcBgLightEnd   = Color(lcHex: "#E9E5DF")
 
     var body: some View {
         ZStack {
-            // Base gradient
+            // Base gradient — adapts to appearance
             LinearGradient(
-                colors: [.lcBgStart, .lcBgEnd],
+                colors: colorScheme == .dark
+                    ? [.lcBgStart, .lcBgEnd]
+                    : [Self.lcBgLightStart, Self.lcBgLightEnd],
                 startPoint: .topLeading,
                 endPoint:   .bottomTrailing
             )
 
-            // Optional noise grain
+            // Optional noise grain (subtler in light)
             if showNoise {
-                LCNoiseTexture(opacity: 0.028)
+                LCNoiseTexture(opacity: colorScheme == .dark ? 0.028 : 0.012)
             }
         }
         .ignoresSafeArea()
@@ -303,6 +335,7 @@ struct GlassCard<Content: View>: View {
     var glowColor:    Color   = .lcPrimary
     var glowOpacity:  Double  = 0.18
     @ViewBuilder var content: () -> Content
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         content()
@@ -344,8 +377,8 @@ struct GlassCard<Content: View>: View {
         }
         // 5. Coloured glow
         .shadow(color: glowColor.opacity(glowOpacity), radius: 32, x: 0, y: 8)
-        // 6. Dark anchor shadow
-        .shadow(color: .black.opacity(0.40), radius: 14, x: 0, y: 6)
+        // 6. Anchor shadow — lighter in light mode
+        .shadow(color: .black.opacity(colorScheme == .dark ? 0.40 : 0.08), radius: 14, x: 0, y: 6)
     }
 }
 

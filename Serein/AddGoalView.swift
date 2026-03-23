@@ -86,7 +86,7 @@ struct AddGoalView: View {
             }
             .scrollDismissesKeyboard(.interactively)
         }
-        .preferredColorScheme(.dark)
+
     }
 
     // ── Save ──────────────────────────────────────────────────

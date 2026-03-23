@@ -46,6 +46,64 @@ struct Goal: Identifiable, Hashable, Codable {
     var orderIndex:  Int        = 0
     var steps:       [GoalStep] = []
 
+    // ── Transient flag — never persisted ──────────────────────────
+    // True for auto-generated example goals shown to new users.
+    // isMock is excluded from CodingKeys so it is never written to disk.
+    var isMock: Bool = false
+
+    // ── CodingKeys — isMock intentionally omitted ─────────────────
+    enum CodingKeys: String, CodingKey {
+        case id, title, lifeAreaId, why, milestones, xpReward,
+             isFocusGoal, isArchived, isPinned, orderIndex, steps
+    }
+
+    // Custom decoder provides safe defaults for any keys added after
+    // the initial release, maintaining backward compatibility.
+    init(from decoder: Decoder) throws {
+        let c        = try decoder.container(keyedBy: CodingKeys.self)
+        id           = try c.decode(UUID.self,         forKey: .id)
+        title        = try c.decode(String.self,       forKey: .title)
+        lifeAreaId   = try c.decode(UUID.self,         forKey: .lifeAreaId)
+        why          = try c.decodeIfPresent(String.self,      forKey: .why)
+        milestones   = try c.decodeIfPresent([Milestone].self, forKey: .milestones)   ?? []
+        xpReward     = try c.decodeIfPresent(Double.self,      forKey: .xpReward)     ?? 300
+        isFocusGoal  = try c.decodeIfPresent(Bool.self,        forKey: .isFocusGoal)  ?? false
+        isArchived   = try c.decodeIfPresent(Bool.self,        forKey: .isArchived)   ?? false
+        isPinned     = try c.decodeIfPresent(Bool.self,        forKey: .isPinned)     ?? false
+        orderIndex   = try c.decodeIfPresent(Int.self,         forKey: .orderIndex)   ?? 0
+        steps        = try c.decodeIfPresent([GoalStep].self,  forKey: .steps)        ?? []
+        isMock       = false  // always false when loading from disk
+    }
+
+    // Memberwise init — used when creating goals in code.
+    init(
+        id:          UUID        = UUID(),
+        title:       String,
+        lifeAreaId:  UUID,
+        why:         String?     = nil,
+        milestones:  [Milestone] = [],
+        xpReward:    Double      = 300,
+        isFocusGoal: Bool        = false,
+        isArchived:  Bool        = false,
+        isPinned:    Bool        = false,
+        orderIndex:  Int         = 0,
+        steps:       [GoalStep]  = [],
+        isMock:      Bool        = false
+    ) {
+        self.id          = id
+        self.title       = title
+        self.lifeAreaId  = lifeAreaId
+        self.why         = why
+        self.milestones  = milestones
+        self.xpReward    = xpReward
+        self.isFocusGoal = isFocusGoal
+        self.isArchived  = isArchived
+        self.isPinned    = isPinned
+        self.orderIndex  = orderIndex
+        self.steps       = steps
+        self.isMock      = isMock
+    }
+
     // MARK: Computed
 
     var completedMilestones: Int { milestones.filter(\.isCompleted).count }

@@ -22,11 +22,19 @@ import SwiftUI
 
 struct GoalsView: View {
     @EnvironmentObject var appState: AppState
-    @State private var navItem:    GoalNavItem?
-    @State private var appeared:   Bool = false
+    @ObservedObject private var access = FeatureAccessManager.shared
+
+    @State private var navItem:     GoalNavItem?
+    @State private var appeared:    Bool = false
     @State private var showAddGoal: Bool = false
+    @State private var showPremium: Bool = false
+    @State private var showEditGoal:   Bool    = false
+    @State private var goalToEdit:     Goal?   = nil
+    @State private var showDeleteAlert: Bool   = false
+    @State private var goalToDelete:   Goal?   = nil
 
     // ── Computed from AppState ─────────────────────────────────
+    // Pinned sections use real goals only (mocks can't be pinned).
 
     private var pinnedGoals: [Goal] {
         appState.goals
@@ -35,13 +43,14 @@ struct GoalsView: View {
     }
 
     private var activeGroups: [GoalGroup] {
-        buildGroups(from: appState.goals.filter { !$0.isArchived && !$0.isComplete && !$0.isPinned })
+        buildGroups(from: appState.displayGoals.filter { !$0.isArchived && !$0.isComplete && !$0.isPinned })
     }
 
     private var completedGoals: [Goal] {
         appState.goals.filter { $0.isComplete && !$0.isArchived }
     }
 
+    // Stats count real goals only — mocks are not user achievements.
     private var totalActive:    Int { appState.goals.filter { !$0.isArchived && !$0.isComplete }.count }
     private var totalCompleted: Int { completedGoals.count }
 
@@ -50,6 +59,7 @@ struct GoalsView: View {
             ZStack {
                 LCBackground(showNoise: true)
 
+                ScrollViewReader { proxy in
                 ScrollView(showsIndicators: false) {
                     VStack(alignment: .leading, spacing: LCSpacing.xl) {
 
@@ -57,13 +67,17 @@ struct GoalsView: View {
                             totalCompleted: totalCompleted,
                             totalActive:    totalActive,
                             appeared:       appeared,
-                            onAdd:          { showAddGoal = true }
+                            onAdd: {
+                                // Check global premium gate — user can always
+                                // reach AddGoalView; per-area gate is checked there.
+                                showAddGoal = true
+                            }
                         )
 
                         if !appeared {
                             GoalsSkeletonSection()
                                 .softAppear(delay: 0.05)
-                        } else if appState.goals.filter({ !$0.isArchived }).isEmpty {
+                        } else if appState.displayGoals.filter({ !$0.isArchived }).isEmpty {
                             GoalsEmptyState(onAdd: { showAddGoal = true })
                                 .softAppear(delay: 0.10)
                         } else {
@@ -87,14 +101,30 @@ struct GoalsView: View {
                             // ── Active goal sections (by area) ─────
                             ForEach(Array(activeGroups.enumerated()), id: \.element.id) { sIdx, group in
                                 GoalsSectionView(
-                                    group:     group,
-                                    baseDelay: 0.20 + Double(sIdx) * 0.10,
-                                    onTap:     { goal in
-                                        navItem = GoalNavItem(goal: goal, area: group.area)
+                                    group:      group,
+                                    realGoals:  appState.goals,
+                                    baseDelay:  0.20 + Double(sIdx) * 0.10,
+                                    onTap: { goal in
+                                        if goal.isMock {
+                                            // Mock tap → create a real goal in this area
+                                            showAddGoal = true
+                                        } else {
+                                            navItem = GoalNavItem(goal: goal, area: group.area)
+                                        }
                                     },
                                     onPin:     { appState.pinGoal($0) },
-                                    onArchive: { appState.archiveGoal($0) }
+                                    onArchive: { appState.archiveGoal($0) },
+                                    onAddGoal: {
+                                        if access.canAddGoal(in: group.area.id, goals: appState.goals) {
+                                            showAddGoal = true
+                                        } else {
+                                            showPremium = true
+                                        }
+                                    },
+                                    onEdit: { goal in goalToEdit = goal; showEditGoal = true },
+                                    onDelete: { goal in goalToDelete = goal; showDeleteAlert = true }
                                 )
+                                .id("area-\(group.area.id)")
                             }
 
                             // ── Completed section ──────────────────
@@ -117,13 +147,50 @@ struct GoalsView: View {
                     .padding(.bottom, LCSpacing.xxl)
                 }
                 .refreshable { appState.load() }
-            }
+                .onChange(of: appState.dashboardFocusAreaId) { _, focusId in
+                    guard let id = focusId else { return }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                        withAnimation(.lcSoftAppear) {
+                            proxy.scrollTo("area-\(id)", anchor: .top)
+                        }
+                        appState.dashboardFocusAreaId = nil
+                    }
+                }
+            } // ScrollViewReader
+            } // ZStack
             .navigationBarHidden(true)
             .sheet(isPresented: $showAddGoal) {
                 AddGoalView()
                     .environmentObject(appState)
                     .presentationDragIndicator(.visible)
                     .presentationDetents([.large])
+            }
+            .sheet(isPresented: $showPremium) {
+                PremiumView()
+                    .presentationDragIndicator(.visible)
+                    .presentationDetents([.large])
+            }
+            .sheet(isPresented: $showEditGoal) {
+                if let goal = goalToEdit,
+                   let area = appState.area(for: goal) {
+                    EditGoalSheet(goal: goal, area: area) { updated in
+                        appState.updateGoal(updated)
+                    }
+                    .environmentObject(appState)
+                    .presentationDragIndicator(.visible)
+                    .presentationDetents([.medium, .large])
+                }
+            }
+            .confirmationDialog("Delete Goal?", isPresented: $showDeleteAlert, titleVisibility: .visible) {
+                Button("Delete", role: .destructive) {
+                    if let goal = goalToDelete {
+                        appState.deleteGoal(goal)
+                        goalToDelete = nil
+                    }
+                }
+                Button("Cancel", role: .cancel) { goalToDelete = nil }
+            } message: {
+                Text("This will permanently remove the goal and all its steps. This cannot be undone.")
             }
             .navigationDestination(item: $navItem) { item in
                 GoalDetailView(
@@ -249,22 +316,48 @@ private struct PinnedGoalsSection: View {
 
 private struct GoalsSectionView: View {
     let group:     GoalGroup
+    let realGoals: [Goal]      // real (non-mock) goals — for usage badge
     let baseDelay: Double
     let onTap:     (Goal) -> Void
     let onPin:     (Goal) -> Void
     let onArchive: (Goal) -> Void
+    let onAddGoal: () -> Void
+    var onEdit:    (Goal) -> Void = { _ in }
+    var onDelete:  (Goal) -> Void = { _ in }
+
+    @ObservedObject private var access = FeatureAccessManager.shared
 
     var body: some View {
         VStack(alignment: .leading, spacing: LCSpacing.sm) {
 
-            let done  = group.goals.filter(\.isComplete).count
-            let total = group.goals.count
+            let done    = group.goals.filter { $0.isComplete && !$0.isMock }.count
+            let total   = group.goals.filter { !$0.isMock }.count
+            let usage   = access.goalUsage(in: group.area.id, goals: realGoals)
+            let canAdd  = access.canAddGoal(in: group.area.id, goals: realGoals)
 
-            SectionHeader(
-                title:    group.area.title,
-                subtitle: "\(done) of \(total) complete",
-                overline: "LIFE AREA"
-            )
+            HStack(alignment: .bottom) {
+                SectionHeader(
+                    title:    group.area.title,
+                    subtitle: total > 0 ? "\(done) of \(total) complete" : "No goals yet",
+                    overline: "LIFE AREA"
+                )
+
+                Spacer()
+
+                // Usage badge (free tier) or add button (premium)
+                if !access.isPremium, let limit = usage.limit {
+                    GoalUsageBadge(used: usage.used, limit: limit, canAdd: canAdd) {
+                        onAddGoal()
+                    }
+                } else if access.isPremium && canAdd {
+                    Button(action: onAddGoal) {
+                        Image(systemName: "plus.circle")
+                            .font(.system(size: 18, weight: .light))
+                            .foregroundStyle(group.area.accent.opacity(0.70))
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
             .softAppear(delay: baseDelay)
 
             ForEach(Array(group.goals.enumerated()), id: \.element.id) { cIdx, goal in
@@ -273,8 +366,10 @@ private struct GoalsSectionView: View {
                     area:      group.area,
                     isPinned:  false,
                     onTap:     { onTap(goal) },
-                    onPin:     { onPin(goal) },
-                    onArchive: { onArchive(goal) }
+                    onPin:     { if !goal.isMock { onPin(goal) } },
+                    onArchive: { if !goal.isMock { onArchive(goal) } },
+                    onEdit:    { if !goal.isMock { onEdit(goal) } },
+                    onDelete:  { if !goal.isMock { onDelete(goal) } }
                 )
                 .softAppear(delay: baseDelay + 0.06 + Double(cIdx) * 0.07)
                 .transition(.asymmetric(
@@ -283,6 +378,43 @@ private struct GoalsSectionView: View {
                 ))
             }
         }
+    }
+}
+
+// ── Goal Usage Badge ───────────────────────────────────────────
+private struct GoalUsageBadge: View {
+    let used:   Int
+    let limit:  Int
+    let canAdd: Bool
+    let onTap:  () -> Void
+
+    var body: some View {
+        Button(action: onTap) {
+            HStack(spacing: 4) {
+                if !canAdd {
+                    Image(systemName: "lock.fill")
+                        .font(.system(size: 9, weight: .medium))
+                        .foregroundStyle(Color.lcGold)
+                }
+                Text(canAdd ? "\(used)/\(limit)" : "Upgrade")
+                    .font(LCFont.overline)
+                    .foregroundStyle(canAdd ? Color.lcTextTertiary : Color.lcGold)
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 5)
+            .background(
+                Capsule(style: .continuous)
+                    .fill(canAdd
+                          ? Color.white.opacity(0.06)
+                          : Color.lcGold.opacity(0.10))
+                    .overlay(Capsule().strokeBorder(
+                        canAdd ? Color.white.opacity(0.10) : Color.lcGold.opacity(0.28),
+                        lineWidth: 0.5
+                    ))
+            )
+        }
+        .buttonStyle(.plain)
+        .alignmentGuide(.bottom) { d in d[.bottom] }
     }
 }
 
@@ -297,36 +429,52 @@ private struct SwipeGoalCard: View {
     let onTap:     () -> Void
     let onPin:     () -> Void
     let onArchive: () -> Void
+    var onEdit:    (() -> Void)? = nil
+    var onDelete:  (() -> Void)? = nil
 
     @State private var offset:  CGFloat = 0
     private let threshold: CGFloat = 72
     private let maxReveal: CGFloat = 88
 
+    // Mock goals are not swipeable — they are read-only examples.
+    private var swipeEnabled: Bool { !goal.isMock }
+
     var body: some View {
         ZStack(alignment: .leading) {
-            // Leading action — Pin / Unpin
-            HStack {
-                SwipeActionChip(
-                    icon:  isPinned ? "pin.slash.fill" : "pin.fill",
-                    label: isPinned ? "Unpin" : "Pin",
-                    color: Color.lcGold
-                )
-                .opacity(offset > 0 ? Double(offset / maxReveal) : 0)
-                Spacer()
-            }
+            if swipeEnabled {
+                // Leading action — Pin / Unpin
+                HStack {
+                    SwipeActionChip(
+                        icon:  isPinned ? "pin.slash.fill" : "pin.fill",
+                        label: isPinned ? "Unpin" : "Pin",
+                        color: Color.lcGold
+                    )
+                    .opacity(offset > 0 ? Double(offset / maxReveal) : 0)
+                    Spacer()
+                }
 
-            // Trailing action — Archive
-            HStack {
-                Spacer()
-                SwipeActionChip(icon: "archivebox.fill", label: "Archive", color: Color.lcPrimary)
-                    .opacity(offset < 0 ? Double(-offset / maxReveal) : 0)
+                // Trailing action — Archive
+                HStack {
+                    Spacer()
+                    SwipeActionChip(icon: "archivebox.fill", label: "Archive", color: Color.lcPrimary)
+                        .opacity(offset < 0 ? Double(-offset / maxReveal) : 0)
+                }
             }
 
             // Card
-            GoalCard(goal: goal, area: area, onTap: onTap)
-                .offset(x: offset)
+            GoalCard(
+                goal:      goal,
+                area:      area,
+                onTap:     onTap,
+                onEdit:    onEdit,
+                onDelete:  onDelete,
+                onPin:     { onPin() },
+                onArchive: { onArchive() }
+            )
+            .offset(x: offset)
                 .gesture(
-                    DragGesture(minimumDistance: 18)
+                    swipeEnabled
+                    ? DragGesture(minimumDistance: 18)
                         .onChanged { v in
                             let dx = v.translation.width
                             offset = dx > 0
@@ -339,6 +487,7 @@ private struct SwipeGoalCard: View {
                             if dx > threshold       { onPin()     }
                             else if dx < -threshold { onArchive() }
                         }
+                    : nil
                 )
         }
         .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
@@ -367,7 +516,11 @@ private struct SwipeActionChip: View {
 struct GoalCard: View {
     let goal:  Goal
     let area:  LifeArea
-    var onTap: () -> Void = {}
+    var onTap:     () -> Void = {}
+    var onEdit:    (() -> Void)? = nil
+    var onDelete:  (() -> Void)? = nil
+    var onPin:     (() -> Void)? = nil
+    var onArchive: (() -> Void)? = nil
 
     @State private var pressed = false
 
@@ -375,7 +528,7 @@ struct GoalCard: View {
         Button(action: onTap) {
             GlassCard(
                 glowColor:   area.accent,
-                glowOpacity: pressed ? 0.28 : 0.13
+                glowOpacity: pressed ? 0.28 : (goal.isMock ? 0.06 : 0.13)
             ) {
                 VStack(alignment: .leading, spacing: 0) {
 
@@ -386,7 +539,17 @@ struct GoalCard: View {
                         Text(area.title.uppercased())
                             .font(LCFont.overline)
                             .foregroundStyle(Color.lcTextTertiary)
-                        if goal.isPinned {
+                        if goal.isMock {
+                            // "Example" badge replaces pin/focus indicators
+                            Text("Example")
+                                .font(LCFont.overline)
+                                .foregroundStyle(Color.lcTextTertiary.opacity(0.60))
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(
+                                    Capsule().fill(Color.white.opacity(0.07))
+                                )
+                        } else if goal.isPinned {
                             Image(systemName: "pin.fill")
                                 .font(.system(size: 9))
                                 .foregroundStyle(Color.lcGold.opacity(0.85))
@@ -396,7 +559,9 @@ struct GoalCard: View {
                                 .foregroundStyle(Color.lcGold)
                         }
                         Spacer(minLength: 0)
-                        GoalXPBadge(xp: goal.xpReward, completed: goal.isComplete)
+                        if !goal.isMock {
+                            GoalXPBadge(xp: goal.xpReward, completed: goal.isComplete)
+                        }
                     }
 
                     Spacer(minLength: LCSpacing.sm)
@@ -465,6 +630,7 @@ struct GoalCard: View {
         }
         .buttonStyle(.plain)
         .scaleEffect(pressed ? 0.97 : 1.0)
+        .opacity(goal.isMock ? 0.80 : 1.0)
         .animation(.lcCardLift, value: pressed)
         .simultaneousGesture(
             DragGesture(minimumDistance: 0)
@@ -473,6 +639,22 @@ struct GoalCard: View {
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.14) { pressed = false }
                 }
         )
+        .contextMenu {
+            if !goal.isMock {
+                if let onEdit = onEdit {
+                    Button { onEdit() } label: { Label("Edit Goal", systemImage: "pencil") }
+                }
+                if let onPin = onPin {
+                    Button { onPin() } label: { Label(goal.isPinned ? "Unpin" : "Pin", systemImage: goal.isPinned ? "pin.slash.fill" : "pin.fill") }
+                }
+                if let onArchive = onArchive {
+                    Button { onArchive() } label: { Label("Archive", systemImage: "archivebox") }
+                }
+                if let onDelete = onDelete {
+                    Button(role: .destructive) { onDelete() } label: { Label("Delete Goal", systemImage: "trash") }
+                }
+            }
+        }
     }
 }
 
@@ -561,7 +743,8 @@ private struct CompletedGoalsSection: View {
             if isExpanded {
                 ForEach(goals) { goal in
                     if let area = lifeAreas.first(where: { $0.id == goal.lifeAreaId }) {
-                        GoalCard(goal: goal, area: area) { onTap(goal) }
+                        // AFTER
+                        GoalCard(goal: goal, area: area, onTap: { onTap(goal) })
                             .transition(.opacity.combined(with: .offset(y: 8)))
                     }
                 }
@@ -655,6 +838,112 @@ private struct GoalsEmptyState: View {
             .padding(LCSpacing.lg)
             .frame(maxWidth: .infinity)
         }
+    }
+}
+
+// ============================================================
+// MARK: - Edit Goal Sheet
+// ============================================================
+
+private struct EditGoalSheet: View {
+    @State private var editTitle: String
+    @State private var editWhy:   String
+    let goal:   Goal
+    let area:   LifeArea
+    let onSave: (Goal) -> Void
+
+    @Environment(\.dismiss) private var dismiss
+    @FocusState private var focusedField: Int?
+
+    init(goal: Goal, area: LifeArea, onSave: @escaping (Goal) -> Void) {
+        self.goal   = goal
+        self.area   = area
+        self.onSave = onSave
+        _editTitle = State(initialValue: goal.title)
+        _editWhy   = State(initialValue: goal.why ?? "")
+    }
+
+    private var canSave: Bool { editTitle.trimmingCharacters(in: .whitespacesAndNewlines).count >= 2 }
+
+    var body: some View {
+        ZStack {
+            LCBackground(showNoise: true)
+            VStack(alignment: .leading, spacing: 0) {
+                Capsule().fill(Color.white.opacity(0.14)).frame(width: 36, height: 4)
+                    .frame(maxWidth: .infinity).padding(.top, 16).padding(.bottom, 20)
+                HStack {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("EDIT GOAL").font(LCFont.overline).foregroundStyle(Color.lcTextTertiary)
+                        Text("Update your goal").font(LCFont.header).foregroundStyle(Color.lcTextPrimary)
+                    }
+                    Spacer()
+                    Button { dismiss() } label: {
+                        Image(systemName: "xmark.circle.fill").font(.system(size: 26, weight: .light))
+                            .foregroundStyle(Color.white.opacity(0.22))
+                    }.buttonStyle(.plain)
+                }
+                .padding(.horizontal, 20).padding(.bottom, 24)
+
+                // Area indicator
+                HStack(spacing: 8) {
+                    Image(systemName: area.icon).font(.system(size: 14, weight: .light)).foregroundStyle(area.accent)
+                    Text(area.title.uppercased()).font(LCFont.overline).foregroundStyle(Color.lcTextTertiary)
+                }
+                .padding(.horizontal, 20).padding(.bottom, 16)
+
+                ScrollView(showsIndicators: false) {
+                    VStack(spacing: 16) {
+                        GlassCard(glowColor: area.accent, glowOpacity: focusedField == 0 ? 0.18 : 0.08) {
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("GOAL TITLE").font(LCFont.overline).foregroundStyle(Color.lcTextTertiary)
+                                TextField("Goal title", text: $editTitle)
+                                    .font(.system(size: 18, weight: .semibold))
+                                    .foregroundStyle(Color.lcTextPrimary)
+                                    .focused($focusedField, equals: 0).submitLabel(.next)
+                                    .onSubmit { focusedField = 1 }
+                            }
+                            .padding(16)
+                        }
+                        .animation(.lcCardLift, value: focusedField == 0)
+
+                        GlassCard(glowColor: area.accent, glowOpacity: focusedField == 1 ? 0.14 : 0.06) {
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("WHY THIS MATTERS  (optional)").font(LCFont.overline).foregroundStyle(Color.lcTextTertiary)
+                                ZStack(alignment: .topLeading) {
+                                    if editWhy.isEmpty {
+                                        Text("Because it will change how I feel about…")
+                                            .font(LCFont.body).foregroundStyle(Color.lcTextTertiary)
+                                            .allowsHitTesting(false).padding(.top, 8).padding(.leading, 4)
+                                    }
+                                    TextEditor(text: $editWhy)
+                                        .font(LCFont.body).foregroundStyle(Color.lcTextPrimary)
+                                        .frame(minHeight: 72).fixedSize(horizontal: false, vertical: true)
+                                        .scrollContentBackground(.hidden).background(.clear)
+                                        .focused($focusedField, equals: 1)
+                                }
+                            }
+                            .padding(16)
+                        }
+                        .animation(.lcCardLift, value: focusedField == 1)
+                    }
+                    .padding(.horizontal, 20).padding(.bottom, 40)
+                }
+                .scrollDismissesKeyboard(.interactively)
+
+                Divider().background(Color.white.opacity(0.07))
+                PrimaryButton(label: "Save Changes", icon: "checkmark.circle.fill", gradient: [area.accent.opacity(0.8), area.accent]) {
+                    var updated = goal
+                    updated.title = editTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+                    updated.why   = editWhy.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : editWhy
+                    onSave(updated)
+                    dismiss()
+                }
+                .disabled(!canSave).opacity(canSave ? 1.0 : 0.40)
+                .padding(.horizontal, 20).padding(.vertical, 16)
+            }
+        }
+
+        .onAppear { focusedField = 0 }
     }
 }
 

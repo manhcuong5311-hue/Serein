@@ -1,13 +1,15 @@
 // OnboardingView.swift
 // Life Compass — Onboarding Flow
 //
-// 6 steps. Short, intentional.
+// 8 steps. Short, intentional.
 // Step 0 — What should we call you?       (name)
 // Step 1 — How old are you?               (age — optional)
 // Step 2 — Who do you want to become?     (vision)
 // Step 3 — Pick your first life area
 // Step 4 — Name your first goal
 // Step 5 — Add one milestone
+// Step 6 — App Overview                   (feature tiles)
+// Step 7 — Paywall                        (premium unlock)
 
 import SwiftUI
 
@@ -39,7 +41,7 @@ struct OnboardingView: View {
     // Step 5 — milestone
     @State private var milestoneTitle: String = ""
 
-    private let totalSteps = 6
+    private let totalSteps = 8
 
     var body: some View {
         ZStack {
@@ -62,6 +64,8 @@ struct OnboardingView: View {
                     case 3: StepLifeArea(areas: appState.lifeAreas, selected: $selectedAreaId)
                     case 4: StepGoal(title: $goalTitle, why: $goalWhy, areaName: selectedAreaName)
                     case 5: StepMilestone(title: $milestoneTitle, goalTitle: goalTitle)
+                    case 6: StepAppOverview()
+                    case 7: StepPaywall(onFinish: finishOnboarding)
                     default: EmptyView()
                     }
                 }
@@ -86,7 +90,7 @@ struct OnboardingView: View {
                 .padding(.bottom, LCSpacing.xl)
             }
         }
-        .preferredColorScheme(.dark)
+
     }
 
     // ── Helpers ───────────────────────────────────────────────
@@ -103,6 +107,8 @@ struct OnboardingView: View {
         case 3: return selectedAreaId != nil
         case 4: return goalTitle.count >= 3
         case 5: return milestoneTitle.count >= 3
+        case 6: return true                        // pure display
+        case 7: return true                        // paywall — user can always skip
         default: return false
         }
     }
@@ -184,7 +190,7 @@ private struct StepName: View {
     var body: some View {
         VStack(alignment: .leading, spacing: LCSpacing.lg) {
             VStack(alignment: .leading, spacing: LCSpacing.xs) {
-                Text("STEP 1 OF 6")
+                Text("STEP 1 OF 8")
                     .font(LCFont.overline)
                     .foregroundStyle(Color.lcTextTertiary)
                     .softAppear(delay: 0.04)
@@ -234,7 +240,7 @@ private struct StepAge: View {
     var body: some View {
         VStack(alignment: .leading, spacing: LCSpacing.lg) {
             VStack(alignment: .leading, spacing: LCSpacing.xs) {
-                Text("STEP 2 OF 6")
+                Text("STEP 2 OF 8")
                     .font(LCFont.overline)
                     .foregroundStyle(Color.lcTextTertiary)
                     .softAppear(delay: 0.04)
@@ -326,7 +332,7 @@ private struct StepVision: View {
     var body: some View {
         VStack(alignment: .leading, spacing: LCSpacing.lg) {
             VStack(alignment: .leading, spacing: LCSpacing.xs) {
-                Text("STEP 3 OF 6")
+                Text("STEP 3 OF 8")
                     .font(LCFont.overline)
                     .foregroundStyle(Color.lcTextTertiary)
                     .softAppear(delay: 0.04)
@@ -382,7 +388,7 @@ private struct StepLifeArea: View {
     var body: some View {
         VStack(alignment: .leading, spacing: LCSpacing.lg) {
             VStack(alignment: .leading, spacing: LCSpacing.xs) {
-                Text("STEP 4 OF 6")
+                Text("STEP 4 OF 8")
                     .font(LCFont.overline)
                     .foregroundStyle(Color.lcTextTertiary)
                     .softAppear(delay: 0.04)
@@ -476,7 +482,7 @@ private struct StepGoal: View {
     var body: some View {
         VStack(alignment: .leading, spacing: LCSpacing.lg) {
             VStack(alignment: .leading, spacing: LCSpacing.xs) {
-                Text("STEP 5 OF 6")
+                Text("STEP 5 OF 8")
                     .font(LCFont.overline)
                     .foregroundStyle(Color.lcTextTertiary)
                     .softAppear(delay: 0.04)
@@ -557,7 +563,7 @@ private struct StepMilestone: View {
     var body: some View {
         VStack(alignment: .leading, spacing: LCSpacing.lg) {
             VStack(alignment: .leading, spacing: LCSpacing.xs) {
-                Text("STEP 6 OF 6")
+                Text("STEP 6 OF 8")
                     .font(LCFont.overline)
                     .foregroundStyle(Color.lcTextTertiary)
                     .softAppear(delay: 0.04)
@@ -607,6 +613,352 @@ private struct StepMilestone: View {
 }
 
 // ============================================================
+// MARK: - Step 6: App Overview
+// ============================================================
+
+private struct FeatureTileData: Identifiable {
+    let id    = UUID()
+    let icon:  String
+    let color: Color
+    let title: String
+    let desc:  String
+}
+
+private struct StepAppOverview: View {
+
+    private let tiles: [FeatureTileData] = [
+        FeatureTileData(icon: "scope",                     color: .lcPrimary,              title: "Set Goals",     desc: "Define what truly matters across 6 life areas"),
+        FeatureTileData(icon: "sun.max",                   color: .lcGold,                 title: "Plan Daily",    desc: "Break goals into small steps. Know exactly what to do today"),
+        FeatureTileData(icon: "arrow.clockwise",           color: .lcLavender,             title: "Build Habits",  desc: "Recurring steps reset each morning to build momentum"),
+        FeatureTileData(icon: "chart.line.uptrend.xyaxis", color: Color(lcHex: "#C4856A"), title: "Track Growth",  desc: "XP and level up as you complete milestones"),
+    ]
+
+    private let columns = [
+        GridItem(.flexible(), spacing: LCSpacing.sm),
+        GridItem(.flexible(), spacing: LCSpacing.sm),
+    ]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: LCSpacing.lg) {
+            // Header
+            VStack(alignment: .leading, spacing: LCSpacing.xs) {
+                Text("STEP 7 OF 8")
+                    .font(LCFont.overline)
+                    .foregroundStyle(Color.lcTextTertiary)
+                    .softAppear(delay: 0.04)
+
+                Text("How Serein\nworks")
+                    .font(LCFont.largeTitle)
+                    .foregroundStyle(Color.lcTextPrimary)
+                    .lineSpacing(4)
+                    .softAppear(delay: 0.10)
+            }
+
+            // Big icon
+            HStack {
+                Spacer()
+                ZStack {
+                    Circle()
+                        .fill(
+                            LinearGradient(
+                                colors: [Color.lcPrimary.opacity(0.25), Color.lcLavender.opacity(0.15)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .frame(width: 72, height: 72)
+
+                    Image(systemName: "sparkles")
+                        .font(.system(size: 32, weight: .light))
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [Color.lcPrimary, Color.lcLavender],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                }
+                .softAppear(delay: 0.14)
+
+                Spacer()
+            }
+
+            // Subtitle
+            Text("Your personal life execution system")
+                .font(LCFont.insight)
+                .foregroundStyle(Color.lcTextSecondary)
+                .frame(maxWidth: .infinity, alignment: .center)
+                .multilineTextAlignment(.center)
+                .softAppear(delay: 0.18)
+
+            // 2×2 feature grid
+            LazyVGrid(columns: columns, spacing: LCSpacing.sm) {
+                ForEach(Array(tiles.enumerated()), id: \.element.id) { idx, tile in
+                    FeatureTile(tile: tile)
+                        .softAppear(delay: 0.22 + Double(idx) * 0.08)
+                }
+            }
+        }
+    }
+}
+
+private struct FeatureTile: View {
+    let tile: FeatureTileData
+
+    var body: some View {
+        GlassCard(glowColor: tile.color, glowOpacity: 0.12) {
+            VStack(alignment: .leading, spacing: LCSpacing.xs) {
+                Image(systemName: tile.icon)
+                    .font(.system(size: 20, weight: .light))
+                    .foregroundStyle(tile.color)
+                    .frame(width: 28, height: 28)
+
+                Text(tile.title)
+                    .font(LCFont.body)
+                    .fontWeight(.semibold)
+                    .foregroundStyle(Color.lcTextPrimary)
+
+                Text(tile.desc)
+                    .font(.system(size: 12))
+                    .foregroundStyle(Color.lcTextTertiary)
+                    .lineSpacing(2)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .padding(LCSpacing.md)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+}
+
+// ============================================================
+// MARK: - Step 7: Paywall
+// ============================================================
+
+private struct PaywallFeature: Identifiable {
+    let id:       UUID   = UUID()
+    let icon:     String
+    let title:    String
+    let subtitle: String
+}
+
+private struct StepPaywall: View {
+    let onFinish: () -> Void   // called after purchase success OR free skip
+
+    @ObservedObject private var access = FeatureAccessManager.shared
+    @State private var glowing = false
+
+    private var isPurchasing: Bool {
+        access.purchaseState == .loading || access.purchaseState == .purchasing
+    }
+
+    private let features: [PaywallFeature] = [
+        PaywallFeature(icon: "infinity",            title: "Unlimited Goals",  subtitle: "No cap across any life area"),
+        PaywallFeature(icon: "calendar.badge.plus", title: "Scheduled Steps",  subtitle: "Plan actions on specific dates"),
+        PaywallFeature(icon: "arrow.clockwise",     title: "Daily Habits",     subtitle: "Steps that auto-reset each morning"),
+        PaywallFeature(icon: "tray.full",           title: "Smart Backlog",    subtitle: "Anytime steps with no deadline"),
+    ]
+
+    var body: some View {
+        ScrollView(showsIndicators: false) {
+            VStack(spacing: LCSpacing.md) {
+
+                // ── Hero ──────────────────────────────────────
+                VStack(spacing: 14) {
+
+                    // Animated glow orb
+                    ZStack {
+                        Circle()
+                            .fill(Color.lcGold.opacity(glowing ? 0.22 : 0.08))
+                            .frame(width: 100, height: 100)
+                            .blur(radius: 16)
+
+                        Circle()
+                            .fill(Color.lcGold.opacity(0.10))
+                            .frame(width: 66, height: 66)
+                            .overlay(
+                                Circle().strokeBorder(
+                                    LinearGradient(
+                                        colors: [Color.lcGold.opacity(0.50), Color.lcGold.opacity(0.15)],
+                                        startPoint: .topLeading,
+                                        endPoint:   .bottomTrailing
+                                    ),
+                                    lineWidth: 1
+                                )
+                            )
+
+                        Image(systemName: "sparkles")
+                            .font(.system(size: 26, weight: .light))
+                            .foregroundStyle(
+                                LinearGradient(
+                                    colors: [Color.lcGold, Color.lcGold.opacity(0.65)],
+                                    startPoint: .topLeading,
+                                    endPoint:   .bottomTrailing
+                                )
+                            )
+                    }
+                    .onAppear {
+                        withAnimation(.easeInOut(duration: 2.2).repeatForever(autoreverses: true)) {
+                            glowing = true
+                        }
+                    }
+
+                    // Title + subtitle
+                    VStack(spacing: 6) {
+                        Text("Go Premium")
+                            .font(.system(size: 30, weight: .semibold))
+                            .foregroundStyle(Color.lcTextPrimary)
+
+                        Text("One purchase. Every feature. Forever.")
+                            .font(LCFont.insight)
+                            .foregroundStyle(Color.lcTextSecondary)
+                            .multilineTextAlignment(.center)
+                    }
+
+                    // Price badge
+                    Text("$9.99  ·  Lifetime  ·  No subscription")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(Color.lcGold)
+                        .padding(.horizontal, 18)
+                        .padding(.vertical, 8)
+                        .background(
+                            Capsule()
+                                .fill(Color.lcGold.opacity(0.10))
+                                .overlay(
+                                    Capsule().strokeBorder(Color.lcGold.opacity(0.35), lineWidth: 0.5)
+                                )
+                        )
+                }
+                .frame(maxWidth: .infinity)
+                .softAppear(delay: 0.06)
+
+                // ── Feature list ──────────────────────────────
+                GlassCard(glowColor: .lcGold, glowOpacity: 0.16) {
+                    VStack(spacing: 0) {
+                        ForEach(Array(features.enumerated()), id: \.element.id) { idx, f in
+                            if idx > 0 {
+                                Divider()
+                                    .padding(.horizontal, LCSpacing.md)
+                            }
+                            HStack(spacing: LCSpacing.sm) {
+                                // Icon tile
+                                ZStack {
+                                    RoundedRectangle(cornerRadius: 9, style: .continuous)
+                                        .fill(Color.lcGold.opacity(0.12))
+                                        .frame(width: 36, height: 36)
+                                    Image(systemName: f.icon)
+                                        .font(.system(size: 14, weight: .medium))
+                                        .foregroundStyle(Color.lcGold)
+                                }
+
+                                // Labels
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(f.title)
+                                        .font(LCFont.body)
+                                        .fontWeight(.medium)
+                                        .foregroundStyle(Color.lcTextPrimary)
+                                    Text(f.subtitle)
+                                        .font(.system(size: 12))
+                                        .foregroundStyle(Color.lcTextTertiary)
+                                }
+
+                                Spacer()
+
+                                Image(systemName: "checkmark.circle.fill")
+                                    .font(.system(size: 18))
+                                    .foregroundStyle(Color.lcGold.opacity(0.70))
+                            }
+                            .padding(.horizontal, LCSpacing.md)
+                            .padding(.vertical, 14)
+                        }
+                    }
+                }
+                .softAppear(delay: 0.18)
+
+                // ── Free plan reassurance ─────────────────────
+                GlassCard(glowColor: .lcPrimary, glowOpacity: 0.06) {
+                    HStack(spacing: LCSpacing.sm) {
+                        Image(systemName: "gift")
+                            .font(.system(size: 15, weight: .light))
+                            .foregroundStyle(Color.lcPrimary.opacity(0.70))
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text("Free plan always available")
+                                .font(LCFont.body)
+                                .fontWeight(.medium)
+                                .foregroundStyle(Color.lcTextSecondary)
+                            Text("1 goal per area · Today & Tomorrow steps · No time limit")
+                                .font(.system(size: 12))
+                                .foregroundStyle(Color.lcTextTertiary)
+                                .lineSpacing(2)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        Spacer()
+                    }
+                    .padding(LCSpacing.md)
+                }
+                .softAppear(delay: 0.26)
+
+                // ── CTAs ──────────────────────────────────────
+                VStack(spacing: 12) {
+
+                    // Unlock button — triggers real App Store purchase
+                    Button {
+                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                        Task {
+                            await access.purchase()
+                            // Auto-advance when purchase succeeds
+                            if access.isPremium { onFinish() }
+                        }
+                    } label: {
+                        HStack(spacing: 8) {
+                            if isPurchasing {
+                                ProgressView().tint(.white).scaleEffect(0.85)
+                            } else {
+                                Image(systemName: "sparkles")
+                            }
+                            Text(isPurchasing
+                                 ? "Processing…"
+                                 : "Unlock Premium — \(access.displayPrice)")
+                                .fontWeight(.semibold)
+                        }
+                        .font(LCFont.body)
+                        .foregroundStyle(.white)
+                        .padding(.vertical, 16)
+                        .padding(.horizontal, LCSpacing.lg)
+                        .frame(maxWidth: .infinity)
+                        .background(
+                            Capsule()
+                                .fill(
+                                    LinearGradient(
+                                        colors: [Color.lcGold, Color(lcHex: "#A8722E")],
+                                        startPoint: .topLeading,
+                                        endPoint:   .bottomTrailing
+                                    )
+                                    .opacity(0.90)
+                                )
+                                .shadow(color: Color.lcGold.opacity(0.40), radius: 18, x: 0, y: 8)
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(isPurchasing)
+
+                    Button(action: onFinish) {
+                        Text("Continue with Free Plan")
+                            .font(LCFont.insight)
+                            .foregroundStyle(Color.lcTextTertiary)
+                            .padding(.vertical, 6)
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(isPurchasing)
+                }
+                .softAppear(delay: 0.32)
+
+                Spacer(minLength: LCSpacing.md)
+            }
+        }
+    }
+}
+
+// ============================================================
 // MARK: - Navigation Actions
 // ============================================================
 
@@ -617,25 +969,29 @@ private struct OnboardingActions: View {
     let onBack:     () -> Void
     let onNext:     () -> Void
 
-    private var isLastStep: Bool { step == totalSteps - 1 }
+    // Step 7 (index) is the paywall — it owns its CTAs; hide all actions here.
+    private var isPaywallStep: Bool { step == totalSteps - 1 }
 
     var body: some View {
-        VStack(spacing: LCSpacing.sm) {
-            PrimaryButton(
-                label:    isLastStep ? "Start My Journey" : "Continue",
-                icon:     isLastStep ? "arrow.right.circle.fill" : "arrow.right",
-                gradient: [Color.lcPrimary, Color.lcLavender]
-            ) { onNext() }
-            .disabled(!canAdvance)
-            .opacity(canAdvance ? 1.0 : 0.40)
+        // Paywall step renders nothing here — StepPaywall has its own buttons.
+        if !isPaywallStep {
+            VStack(spacing: LCSpacing.sm) {
+                PrimaryButton(
+                    label:    "Continue",
+                    icon:     "arrow.right",
+                    gradient: [Color.lcPrimary, Color.lcLavender]
+                ) { onNext() }
+                .disabled(!canAdvance)
+                .opacity(canAdvance ? 1.0 : 0.40)
 
-            if step > 0 {
-                Button(action: onBack) {
-                    Text("Back")
-                        .font(LCFont.insight)
-                        .foregroundStyle(Color.lcTextTertiary)
+                if step > 0 {
+                    Button(action: onBack) {
+                        Text("Back")
+                            .font(LCFont.insight)
+                            .foregroundStyle(Color.lcTextTertiary)
+                    }
+                    .buttonStyle(.plain)
                 }
-                .buttonStyle(.plain)
             }
         }
     }

@@ -16,10 +16,12 @@ struct AddStepView: View {
     let onSave:  (GoalStep) -> Void
 
     @Environment(\.dismiss) private var dismiss
+    @ObservedObject private var access = FeatureAccessManager.shared
 
     @State private var title:         String   = ""
     @State private var selectedType:  StepType = .today
     @State private var scheduledDate: Date     = Calendar.current.date(byAdding: .day, value: 1, to: Date()) ?? Date()
+    @State private var showPremium:   Bool     = false
 
     @FocusState private var titleFocused: Bool
 
@@ -91,10 +93,19 @@ struct AddStepView: View {
                             GlassCard(glowColor: .lcPrimary, glowOpacity: 0.08) {
                                 VStack(spacing: 0) {
                                     ForEach(Array(StepType.allCases.enumerated()), id: \.element) { idx, type in
+                                        let isLocked = access.isStepTypeLocked(type)
                                         StepTypeRow(
                                             type:       type,
                                             isSelected: selectedType == type,
-                                            onTap:      { withAnimation(.lcCardLift) { selectedType = type } }
+                                            isLocked:   isLocked,
+                                            onTap: {
+                                                if isLocked {
+                                                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                                    showPremium = true
+                                                } else {
+                                                    withAnimation(.lcCardLift) { selectedType = type }
+                                                }
+                                            }
                                         )
                                         if idx < StepType.allCases.count - 1 {
                                             Divider()
@@ -154,8 +165,13 @@ struct AddStepView: View {
                 .background(.ultraThinMaterial)
             }
         }
-        .preferredColorScheme(.dark)
+
         .onAppear { titleFocused = true }
+        .sheet(isPresented: $showPremium) {
+            PremiumView()
+                .presentationDragIndicator(.visible)
+                .presentationDetents([.large])
+        }
     }
 
     // ── Action ────────────────────────────────────────────────
@@ -182,24 +198,41 @@ struct AddStepView: View {
 private struct StepTypeRow: View {
     let type:       StepType
     let isSelected: Bool
+    let isLocked:   Bool
     let onTap:      () -> Void
 
     var body: some View {
-        Button(action: {
-            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-            onTap()
-        }) {
+        Button(action: onTap) {
             HStack(spacing: LCSpacing.sm) {
                 Image(systemName: type.icon)
                     .font(.system(size: 14, weight: .light))
-                    .foregroundStyle(isSelected ? Color.lcPrimary : Color.lcTextTertiary)
+                    .foregroundStyle(rowAccent)
                     .frame(width: 24)
 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(type.displayName)
-                        .font(LCFont.body)
-                        .fontWeight(.medium)
-                        .foregroundStyle(isSelected ? Color.lcTextPrimary : Color.lcTextSecondary)
+                    HStack(spacing: 6) {
+                        Text(type.displayName)
+                            .font(LCFont.body)
+                            .fontWeight(.medium)
+                            .foregroundStyle(isLocked ? Color.lcTextTertiary : (isSelected ? Color.lcTextPrimary : Color.lcTextSecondary))
+
+                        if isLocked {
+                            // Premium lock badge
+                            HStack(spacing: 3) {
+                                Image(systemName: "lock.fill")
+                                    .font(.system(size: 8, weight: .semibold))
+                                Text("Premium")
+                                    .font(.system(size: 10, weight: .medium))
+                            }
+                            .foregroundStyle(Color.lcGold)
+                            .padding(.horizontal, 7)
+                            .padding(.vertical, 3)
+                            .background(
+                                Capsule().fill(Color.lcGold.opacity(0.12))
+                                    .overlay(Capsule().strokeBorder(Color.lcGold.opacity(0.25), lineWidth: 0.5))
+                            )
+                        }
+                    }
 
                     Text(type.typeDescription)
                         .font(.system(size: 12))
@@ -208,7 +241,11 @@ private struct StepTypeRow: View {
 
                 Spacer()
 
-                if isSelected {
+                if isLocked {
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(Color.lcGold.opacity(0.50))
+                } else if isSelected {
                     Image(systemName: "checkmark.circle.fill")
                         .font(.system(size: 18, weight: .medium))
                         .foregroundStyle(Color.lcPrimary)
@@ -220,8 +257,15 @@ private struct StepTypeRow: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .background(isSelected ? Color.lcPrimary.opacity(0.06) : .clear)
+        .opacity(isLocked ? 0.60 : 1.0)
+        .background(isSelected && !isLocked ? Color.lcPrimary.opacity(0.06) : .clear)
         .animation(.lcCardLift, value: isSelected)
+    }
+
+    private var rowAccent: Color {
+        if isLocked   { return Color.lcTextTertiary }
+        if isSelected { return Color.lcPrimary }
+        return Color.lcTextTertiary
     }
 }
 

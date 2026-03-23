@@ -52,7 +52,7 @@ struct FutureSelfView: View {
                     .zIndex(10)
             }
         }
-        .preferredColorScheme(.dark)
+
         .onAppear {
             vm.load()
             vm.onVisionSaved = { appState.saveFutureVision($0) }

@@ -29,10 +29,25 @@ final class AppState: ObservableObject {
     // ── Core data ─────────────────────────────────────────────
     @Published var userProfile:     UserProfile?       = nil
     @Published var lifeAreas:       [LifeArea]         = []
-    @Published var goals:           [Goal]             = []
+    @Published var goals:           [Goal]             = []   // real goals only — persisted
     @Published var reflections:     [WeeklyReflection] = []
     @Published var dailyActivities: [DailyActivity]    = []
     @Published var futureVision:    FutureVision       = .placeholder
+
+    // ── Mock goals — transient, never persisted ────────────────
+    // Generated per life area when that area has no real goals.
+    // Auto-disappear the moment a real goal is added.
+    var mockGoals: [Goal] {
+        lifeAreas.flatMap { area -> [Goal] in
+            let hasReal = goals.contains {
+                $0.lifeAreaId == area.id && !$0.isArchived
+            }
+            return hasReal ? [] : MockGoalProvider.goals(for: area.id)
+        }
+    }
+
+    /// Goals as shown in the UI: real goals merged with per-area example goals.
+    var displayGoals: [Goal] { goals + mockGoals }
 
     // ── Derived state ─────────────────────────────────────────
     @Published private(set) var todaySteps:                 [TodayStepItem] = []
@@ -42,9 +57,20 @@ final class AppState: ObservableObject {
     @Published private(set) var totalXPToday:               Double = 0
     @Published private(set) var shouldShowReflectionPrompt: Bool   = false
 
+    // ── Cross-tab navigation ──────────────────────────────────
+    /// Set by LifeDashboardView when the user taps a life-area card.
+    /// GoalsView observes this and scrolls to the matching area section.
+    @Published var dashboardFocusAreaId: UUID? = nil
+
+    // ── App Store review ──────────────────────────────────────
+    /// Fires once — after the user saves their first step in their first goal.
+    /// MainTabView watches this and calls requestReview().
+    @Published var shouldRequestReview: Bool = false
+
     // ── App settings ──────────────────────────────────────────
     @AppStorage("lc.onboardingComplete") var onboardingComplete: Bool = false
     @AppStorage("lc.currentAge")         var currentAge: Int = 25
+    @AppStorage("lc.reviewRequested")    var reviewRequested:    Bool = false
 
     // ── Init ──────────────────────────────────────────────────
     init() { load() }
@@ -115,10 +141,23 @@ final class AppState: ObservableObject {
     // ============================================================
 
     func addStep(_ step: GoalStep, to goalId: UUID) {
+        // Capture whether this is the very first step the user has ever added,
+        // before mutating the array. One-shot: guarded by the persisted flag.
+        let isFirstStep = !reviewRequested && goals.flatMap(\.steps).isEmpty
+
         guard let idx = goals.firstIndex(where: { $0.id == goalId }) else { return }
         withAnimation(.lcSoftAppear) { goals[idx].steps.append(step) }
         persistGoals()
         recompute()
+
+        if isFirstStep {
+            reviewRequested = true           // persisted — never fires again
+            // Small delay so the AddStep sheet dismisses and the UI settles
+            // before the system dialog appears.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                self.shouldRequestReview = true
+            }
+        }
     }
 
     func completeStep(goalId: UUID, stepId: UUID) {
@@ -161,9 +200,18 @@ final class AppState: ObservableObject {
     }
 
     func addGoal(_ goal: Goal) {
-        withAnimation(.lcSoftAppear) { goals.append(goal) }
+        // Mock goals for this area auto-disappear because displayGoals
+        // recomputes from the real goals array — no cleanup needed.
+        var realGoal = goal
+        realGoal.isMock = false
+        withAnimation(.lcSoftAppear) { goals.append(realGoal) }
         persistGoals()
         recompute()
+    }
+
+    /// True when the user is allowed to add another goal to the given life area.
+    func canAddGoal(in areaId: UUID) -> Bool {
+        FeatureAccessManager.shared.canAddGoal(in: areaId, goals: goals)
     }
 
     func markAsFocus(_ goal: Goal) {
@@ -197,6 +245,15 @@ final class AppState: ObservableObject {
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
         guard let idx = goals.firstIndex(where: { $0.id == goal.id }) else { return }
         withAnimation(.lcSoftAppear) { goals[idx].isArchived = true }
+        persistGoals()
+        recompute()
+    }
+
+    func deleteGoal(_ goal: Goal) {
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        withAnimation(.lcSoftAppear) {
+            goals.removeAll { $0.id == goal.id }
+        }
         persistGoals()
         recompute()
     }

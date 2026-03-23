@@ -54,7 +54,7 @@ struct WeeklyReflectionView: View {
             }
         }
         .animation(.lcSoftAppear, value: vm.phase == .writing)
-        .preferredColorScheme(.dark)
+
         .onAppear { vm.onReflectionSaved = onReflectionSaved }
     }
 }
@@ -468,7 +468,7 @@ private struct ReflectionSkippedView: View {
             onContinue:    {}
         )
     }
-    .preferredColorScheme(.dark)
+
 }
 
 #Preview("Reflection — Skipped") {
@@ -476,5 +476,5 @@ private struct ReflectionSkippedView: View {
         LCBackground(showNoise: true)
         ReflectionSkippedView(onDismiss: {})
     }
-    .preferredColorScheme(.dark)
+
 }

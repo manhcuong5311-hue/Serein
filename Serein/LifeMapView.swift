@@ -34,7 +34,7 @@ struct LifeMapView: View {
             }
         }
         .animation(.lcSoftAppear, value: vm.phase)
-        .preferredColorScheme(.dark)
+
         .task {
             await vm.load(
                 goals:  appState.goals,

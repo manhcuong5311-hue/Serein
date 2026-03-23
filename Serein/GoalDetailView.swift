@@ -48,6 +48,9 @@ final class GoalDetailViewModel: ObservableObject {
     @Published var showAddMilestone:  Bool    = false
     @Published var newMilestoneText:  String  = ""
     @Published var showAddStep:       Bool    = false
+    @Published var showEditStep:   Bool       = false
+    @Published var editingStep:    GoalStep?  = nil
+    @Published var showEditGoal:   Bool       = false
 
     var onGoalUpdated:        (Goal)          -> Void
     var onMilestoneCompleted: (Double, UUID)  -> Void   // xp, lifeAreaId
@@ -131,6 +134,37 @@ final class GoalDetailViewModel: ObservableObject {
             goal.steps.append(step)
         }
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        onGoalUpdated(goal)
+    }
+
+    // ── Delete step ──────────────────────────────────────────────
+    func deleteStep(id: UUID) {
+        withAnimation(.lcSoftAppear) {
+            goal.steps.removeAll { $0.id == id }
+        }
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        onGoalUpdated(goal)
+    }
+
+    // ── Update step (from inline edit) ────────────────────────────
+    func updateStep(_ step: GoalStep) {
+        guard let idx = goal.steps.firstIndex(where: { $0.id == step.id }) else { return }
+        withAnimation(.lcSoftAppear) { goal.steps[idx] = step }
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        onGoalUpdated(goal)
+    }
+
+    // ── Update goal title ─────────────────────────────────────────
+    func updateGoalTitle(_ title: String) {
+        let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        goal.title = trimmed
+        onGoalUpdated(goal)
+    }
+
+    // ── Update goal why ───────────────────────────────────────────
+    func updateGoalWhy(_ why: String) {
+        goal.why = why.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : why
         onGoalUpdated(goal)
     }
 
@@ -274,7 +308,9 @@ struct GoalDetailView: View {
                             overline: "SCHEDULED",
                             steps:    vm.upcomingSteps,
                             accent:   area.accent,
-                            onToggle: { vm.completeStep(id: $0) }
+                            onToggle: { vm.completeStep(id: $0) },
+                            onDelete: { vm.deleteStep(id: $0) },
+                            onEdit:   { vm.editingStep = $0; vm.showEditStep = true }
                         )
                         .softAppear(delay: 0.28)
                     }
@@ -286,7 +322,9 @@ struct GoalDetailView: View {
                             overline: "ANYTIME",
                             steps:    vm.backlogSteps,
                             accent:   area.accent,
-                            onToggle: { vm.completeStep(id: $0) }
+                            onToggle: { vm.completeStep(id: $0) },
+                            onDelete: { vm.deleteStep(id: $0) },
+                            onEdit:   { vm.editingStep = $0; vm.showEditStep = true }
                         )
                         .softAppear(delay: 0.32)
                     }
@@ -328,12 +366,33 @@ struct GoalDetailView: View {
             }
         }
         .navigationBarHidden(true)
-        .preferredColorScheme(.dark)
+
         .sheet(isPresented: $vm.showAddStep) {
             AddStepView(goalId: vm.goal.id) { step in
                 vm.addStep(step)
             }
             .presentationDetents([.large])
+            .presentationDragIndicator(.visible)
+        }
+        .sheet(isPresented: $vm.showEditStep) {
+            if let step = vm.editingStep {
+                EditStepSheet(step: step) { updated in
+                    vm.updateStep(updated)
+                }
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
+            }
+        }
+        .sheet(isPresented: $vm.showEditGoal) {
+            EditGoalInfoSheet(
+                title: vm.goal.title,
+                why:   vm.goal.why ?? "",
+                accent: area.accent
+            ) { newTitle, newWhy in
+                vm.updateGoalTitle(newTitle)
+                vm.updateGoalWhy(newWhy)
+            }
+            .presentationDetents([.medium])
             .presentationDragIndicator(.visible)
         }
         .animation(.lcSoftAppear, value: vm.showCelebration)
@@ -409,6 +468,9 @@ private struct DetailHeader: View {
                 .foregroundStyle(Color.lcTextPrimary)
                 .lineSpacing(4)
                 .fixedSize(horizontal: false, vertical: true)
+                .contextMenu {
+                    Button { vm.showEditGoal = true } label: { Label("Edit Goal", systemImage: "pencil") }
+                }
 
             HStack {
                 Spacer()
@@ -564,10 +626,12 @@ private struct TodayStepsSection: View {
                     } else {
                         ForEach(Array(vm.todaySteps.enumerated()), id: \.element.id) { idx, step in
                             DetailStepRow(
-                                step:      step,
-                                accent:    area.accent,
+                                step:          step,
+                                accent:        area.accent,
                                 isHighlighted: true,
-                                onToggle:  { vm.completeStep(id: step.id) }
+                                onToggle:      { vm.completeStep(id: step.id) },
+                                onDelete:      { vm.deleteStep(id: step.id) },
+                                onEdit:        { vm.editingStep = step; vm.showEditStep = true }
                             )
                             .softAppear(delay: 0.04 + Double(idx) * 0.05)
 
@@ -616,6 +680,8 @@ private struct StepListSection: View {
     let steps:    [GoalStep]
     let accent:   Color
     let onToggle: (UUID) -> Void
+    var onDelete: (UUID) -> Void     = { _ in }
+    var onEdit:   (GoalStep) -> Void = { _ in }
 
     var body: some View {
         VStack(alignment: .leading, spacing: LCSpacing.sm) {
@@ -633,7 +699,9 @@ private struct StepListSection: View {
                             step:          step,
                             accent:        accent,
                             isHighlighted: false,
-                            onToggle:      { onToggle(step.id) }
+                            onToggle:      { onToggle(step.id) },
+                            onDelete:      { onDelete(step.id) },
+                            onEdit:        { onEdit(step) }
                         )
 
                         if idx < steps.count - 1 {
@@ -655,6 +723,8 @@ private struct DetailStepRow: View {
     let accent:        Color
     let isHighlighted: Bool
     let onToggle:      () -> Void
+    var onDelete:      (() -> Void)? = nil
+    var onEdit:        (() -> Void)? = nil
 
     @State private var checkScale: CGFloat = 1.0
 
@@ -712,6 +782,22 @@ private struct DetailStepRow: View {
         .padding(.horizontal, LCSpacing.md)
         .padding(.vertical, 14)
         .contentShape(Rectangle())
+        .contextMenu {
+            if let onEdit = onEdit {
+                Button {
+                    onEdit()
+                } label: {
+                    Label("Edit Step", systemImage: "pencil")
+                }
+            }
+            if let onDelete = onDelete {
+                Button(role: .destructive) {
+                    onDelete()
+                } label: {
+                    Label("Delete Step", systemImage: "trash")
+                }
+            }
+        }
         .onTapGesture(perform: handleToggle)
         .background(
             isHighlighted && !step.isCompleted
@@ -1076,6 +1162,219 @@ private struct MicroFeedbackToast: View {
                 .shadow(color: accent.opacity(0.30), radius: 16, y: 4)
                 .shadow(color: .black.opacity(0.30), radius: 8,  y: 2)
         )
+    }
+}
+
+// ============================================================
+// MARK: - Edit Step Sheet
+// ============================================================
+
+private struct EditStepSheet: View {
+    let step:    GoalStep
+    let onSave:  (GoalStep) -> Void
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var title:         String   = ""
+    @State private var selectedType:  StepType = .today
+    @State private var scheduledDate: Date     = Date()
+    @FocusState private var focused: Bool
+
+    init(step: GoalStep, onSave: @escaping (GoalStep) -> Void) {
+        self.step   = step
+        self.onSave = onSave
+        _title         = State(initialValue: step.title)
+        _selectedType  = State(initialValue: step.type)
+        _scheduledDate = State(initialValue: step.scheduledDate ?? Calendar.current.date(byAdding: .day, value: 1, to: Date()) ?? Date())
+    }
+
+    private var canSave: Bool { title.trimmingCharacters(in: .whitespacesAndNewlines).count >= 1 }
+
+    var body: some View {
+        ZStack {
+            LCBackground(showNoise: true)
+            VStack(alignment: .leading, spacing: 0) {
+                // Handle
+                Capsule().fill(Color.white.opacity(0.14)).frame(width: 36, height: 4)
+                    .frame(maxWidth: .infinity).padding(.top, 16).padding(.bottom, 20)
+
+                HStack {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("EDIT STEP").font(LCFont.overline).foregroundStyle(Color.lcTextTertiary)
+                        Text("Refine your action").font(LCFont.header).foregroundStyle(Color.lcTextPrimary)
+                    }
+                    Spacer()
+                    Button { dismiss() } label: {
+                        Image(systemName: "xmark.circle.fill").font(.system(size: 26, weight: .light)).foregroundStyle(Color.white.opacity(0.22))
+                    }.buttonStyle(.plain)
+                }
+                .padding(.horizontal, 20).padding(.bottom, 24)
+
+                ScrollView(showsIndicators: false) {
+                    VStack(spacing: 20) {
+                        GlassCard(glowColor: .lcPrimary, glowOpacity: focused ? 0.20 : 0.08) {
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("STEP TITLE").font(LCFont.overline).foregroundStyle(Color.lcTextTertiary)
+                                TextField("Describe the action…", text: $title)
+                                    .font(.system(size: 18, weight: .semibold))
+                                    .foregroundStyle(Color.lcTextPrimary)
+                                    .focused($focused)
+                                    .submitLabel(.done)
+                            }
+                            .padding(16)
+                        }
+                        .animation(.lcCardLift, value: focused)
+
+                        VStack(alignment: .leading, spacing: 10) {
+                            Text("WHEN").font(LCFont.overline).foregroundStyle(Color.lcTextTertiary)
+                            GlassCard(glowColor: .lcPrimary, glowOpacity: 0.08) {
+                                VStack(spacing: 0) {
+                                    ForEach(Array(StepType.allCases.enumerated()), id: \.element) { idx, type in
+                                        let locked = FeatureAccessManager.shared.isStepTypeLocked(type)
+                                        HStack(spacing: 14) {
+                                            Image(systemName: type.icon).font(.system(size: 14, weight: .light))
+                                                .foregroundStyle(selectedType == type ? Color.lcPrimary : Color.lcTextTertiary).frame(width: 24)
+                                            Text(type.displayName).font(LCFont.body).fontWeight(.medium)
+                                                .foregroundStyle(locked ? Color.lcTextTertiary : (selectedType == type ? Color.lcTextPrimary : Color.lcTextSecondary))
+                                            if locked {
+                                                Text("Premium").font(.system(size: 10, weight: .medium)).foregroundStyle(Color.lcGold)
+                                                    .padding(.horizontal, 7).padding(.vertical, 3)
+                                                    .background(Capsule().fill(Color.lcGold.opacity(0.12)))
+                                            }
+                                            Spacer()
+                                            if selectedType == type && !locked {
+                                                Image(systemName: "checkmark.circle.fill").font(.system(size: 18)).foregroundStyle(Color.lcPrimary)
+                                            }
+                                        }
+                                        .padding(.horizontal, 16).padding(.vertical, 14).contentShape(Rectangle())
+                                        .opacity(locked ? 0.60 : 1.0)
+                                        .onTapGesture { if !locked { withAnimation(.lcCardLift) { selectedType = type } } }
+                                        if idx < StepType.allCases.count - 1 {
+                                            Divider().background(Color.white.opacity(0.06)).padding(.horizontal, 16)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        if selectedType == .scheduled {
+                            VStack(alignment: .leading, spacing: 10) {
+                                Text("DATE").font(LCFont.overline).foregroundStyle(Color.lcTextTertiary)
+                                GlassCard(glowColor: .lcPrimary, glowOpacity: 0.10) {
+                                    DatePicker("", selection: $scheduledDate, in: Date()..., displayedComponents: .date)
+                                        .datePickerStyle(.graphical).tint(Color.lcPrimary).labelsHidden().padding(10)
+                                }
+                            }
+                            .transition(.opacity.combined(with: .offset(y: -8)))
+                        }
+                    }
+                    .padding(.horizontal, 20).padding(.bottom, 40).animation(.lcSoftAppear, value: selectedType)
+                }
+
+                Divider().background(Color.white.opacity(0.07))
+                PrimaryButton(label: "Save Changes", icon: "checkmark.circle.fill", gradient: [Color.lcPrimary, Color.lcLavender]) {
+                    var updated = step
+                    updated.title = title.trimmingCharacters(in: .whitespacesAndNewlines)
+                    updated.type  = selectedType
+                    updated.scheduledDate = selectedType == .scheduled ? scheduledDate : nil
+                    onSave(updated)
+                    dismiss()
+                }
+                .disabled(!canSave).opacity(canSave ? 1.0 : 0.40)
+                .padding(.horizontal, 20).padding(.vertical, 16)
+            }
+        }
+
+        .onAppear { focused = true }
+    }
+}
+
+// ============================================================
+// MARK: - Edit Goal Info Sheet
+// ============================================================
+
+private struct EditGoalInfoSheet: View {
+    @State private var editTitle: String
+    @State private var editWhy:   String
+    let accent:  Color
+    let onSave:  (String, String) -> Void
+
+    @Environment(\.dismiss) private var dismiss
+    @FocusState private var focusedField: Int?
+
+    init(title: String, why: String, accent: Color, onSave: @escaping (String, String) -> Void) {
+        _editTitle = State(initialValue: title)
+        _editWhy   = State(initialValue: why)
+        self.accent = accent
+        self.onSave = onSave
+    }
+
+    private var canSave: Bool { editTitle.trimmingCharacters(in: .whitespacesAndNewlines).count >= 2 }
+
+    var body: some View {
+        ZStack {
+            LCBackground(showNoise: true)
+            VStack(alignment: .leading, spacing: 0) {
+                Capsule().fill(Color.white.opacity(0.14)).frame(width: 36, height: 4)
+                    .frame(maxWidth: .infinity).padding(.top, 16).padding(.bottom, 20)
+                HStack {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("EDIT GOAL").font(LCFont.overline).foregroundStyle(Color.lcTextTertiary)
+                        Text("Update your goal details").font(LCFont.header).foregroundStyle(Color.lcTextPrimary)
+                    }
+                    Spacer()
+                    Button { dismiss() } label: {
+                        Image(systemName: "xmark.circle.fill").font(.system(size: 26, weight: .light)).foregroundStyle(Color.white.opacity(0.22))
+                    }.buttonStyle(.plain)
+                }
+                .padding(.horizontal, 20).padding(.bottom, 24)
+
+                ScrollView(showsIndicators: false) {
+                    VStack(spacing: 16) {
+                        GlassCard(glowColor: accent, glowOpacity: focusedField == 0 ? 0.18 : 0.08) {
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("GOAL TITLE").font(LCFont.overline).foregroundStyle(Color.lcTextTertiary)
+                                TextField("Goal title", text: $editTitle)
+                                    .font(.system(size: 18, weight: .semibold)).foregroundStyle(Color.lcTextPrimary)
+                                    .focused($focusedField, equals: 0).submitLabel(.next)
+                                    .onSubmit { focusedField = 1 }
+                            }
+                            .padding(16)
+                        }
+                        .animation(.lcCardLift, value: focusedField == 0)
+
+                        GlassCard(glowColor: accent, glowOpacity: focusedField == 1 ? 0.14 : 0.06) {
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("WHY THIS MATTERS  (optional)").font(LCFont.overline).foregroundStyle(Color.lcTextTertiary)
+                                ZStack(alignment: .topLeading) {
+                                    if editWhy.isEmpty {
+                                        Text("Because it will change how I feel about…").font(LCFont.body)
+                                            .foregroundStyle(Color.lcTextTertiary).allowsHitTesting(false)
+                                            .padding(.top, 8).padding(.leading, 4)
+                                    }
+                                    TextEditor(text: $editWhy).font(LCFont.body).foregroundStyle(Color.lcTextPrimary)
+                                        .frame(minHeight: 72).fixedSize(horizontal: false, vertical: true)
+                                        .scrollContentBackground(.hidden).background(.clear)
+                                        .focused($focusedField, equals: 1)
+                                }
+                            }
+                            .padding(16)
+                        }
+                        .animation(.lcCardLift, value: focusedField == 1)
+                    }
+                    .padding(.horizontal, 20).padding(.bottom, 40)
+                }
+
+                Divider().background(Color.white.opacity(0.07))
+                PrimaryButton(label: "Save Changes", icon: "checkmark.circle.fill", gradient: [accent.opacity(0.8), accent]) {
+                    onSave(editTitle, editWhy)
+                    dismiss()
+                }
+                .disabled(!canSave).opacity(canSave ? 1.0 : 0.40)
+                .padding(.horizontal, 20).padding(.vertical, 16)
+            }
+        }
+
+        .onAppear { focusedField = 0 }
     }
 }
 

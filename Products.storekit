@@ -1,0 +1,40 @@
+{
+  "identifier" : "serein_storekit",
+  "nonConsumableProducts" : [
+    {
+      "displayPrice" : "9.99",
+      "familyShareable" : false,
+      "internalID" : "serein_premium_001",
+      "localizations" : [
+        {
+          "description" : "Unlock all premium features permanently. Unlimited goals, advanced planning, daily habits, and smart backlog.",
+          "displayName" : "Serein Premium",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "com.serein.premium.lifetime",
+      "referenceName" : "SereinPremium",
+      "type" : "NonConsumable"
+    }
+  ],
+  "settings" : {
+    "_askToBuyEnabled" : false,
+    "_billingGracePeriodEnabled" : false,
+    "_customerInfoCacheDurationSeconds" : 86400,
+    "_failTransactionsEnabled" : false,
+    "_isSandboxEnvironment" : true,
+    "_locale" : "en_US",
+    "_storefront" : "USA",
+    "_storeKitErrors" : [
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Load Products"
+      }
+    ]
+  },
+  "version" : {
+    "major" : 3,
+    "minor" : 0
+  }
+}

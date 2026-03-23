@@ -21,7 +21,7 @@ import SwiftUI
 
 struct LifeDashboardView: View {
     @EnvironmentObject var appState: AppState
-    var onGoToGoals:      (() -> Void)? = nil
+    var onGoToGoals:      ((UUID?) -> Void)? = nil
     var onGoToReflection: (() -> Void)? = nil
     var onGoToVision:     (() -> Void)? = nil
 
@@ -50,7 +50,7 @@ struct LifeDashboardView: View {
                     }
 
                     // Life areas grid
-                    LifeAreaSection()
+                    LifeAreaSection(onAreaTap: { areaId in onGoToGoals?(areaId) })
 
                     // Reflection prompt (conditional)
                     if appState.shouldShowReflectionPrompt {
@@ -70,7 +70,7 @@ struct LifeDashboardView: View {
                             .softAppear(delay: 0.50)
 
                         InsightCardView(
-                            insight:     DailyInsight.placeholder,
+                            insight:     DailyInsight.today,
                             xpToday:     appState.totalXPToday,
                             hasActivity: appState.hasActivityToday
                         )
@@ -90,7 +90,7 @@ struct LifeDashboardView: View {
             .refreshable { appState.load() }
         }
         .navigationBarHidden(true)
-        .preferredColorScheme(.dark)
+
         .navigationDestination(item: $navItem) { item in
             GoalDetailView(
                 goal: item.goal,
@@ -510,6 +510,7 @@ private struct DailyFocusCard: View {
 
 private struct LifeAreaSection: View {
     @EnvironmentObject var appState: AppState
+    var onAreaTap: ((UUID) -> Void)? = nil
 
     private let columns = [
         GridItem(.flexible(), spacing: 16),
@@ -534,7 +535,7 @@ private struct LifeAreaSection: View {
             } else {
                 LazyVGrid(columns: columns, spacing: 16) {
                     ForEach(Array(appState.lifeAreas.enumerated()), id: \.element.id) { idx, area in
-                        LifeAreaCard(area: area)
+                        LifeAreaCard(area: area, onTap: { onAreaTap?(area.id) })
                             .softAppear(delay: 0.32 + Double(idx) * 0.06)
                     }
                 }

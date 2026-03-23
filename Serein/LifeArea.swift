@@ -131,13 +131,122 @@ extension LifeArea {
 // ============================================================
 
 struct DailyInsight {
-    let text:   String
-    let source: String?
+    let text:     String
+    let category: Category
+    let source:   String?
 
-    static let placeholder = DailyInsight(
-        text: "Each small step you take today compounds into the life you envision. Progress isn't always visible — but it's always real.",
-        source: nil
-    )
+    enum Category { case momentum, focus, clarity, growth, resilience, mindset }
+
+    // Returns a different insight each calendar day, cycling through the full pool.
+    static var today: DailyInsight {
+        let dayOfYear = Calendar.current.ordinality(of: .day, in: .year, for: Date()) ?? 1
+        return pool[dayOfYear % pool.count]
+    }
+
+    // ── Legacy placeholder alias ───────────────────────────────
+    static var placeholder: DailyInsight { today }
+
+    // ── 42-insight rotating pool ──────────────────────────────
+    // Each insight is tied to a real life-execution context: morning
+    // energy, goal inertia, habit building, reflection, focus, identity.
+    static let pool: [DailyInsight] = [
+
+        // MOMENTUM
+        .init(text: "The goal isn't motivation — it's motion. Start before you feel ready.",
+              category: .momentum, source: nil),
+        .init(text: "Consistency is the only superpower available to everyone.",
+              category: .momentum, source: nil),
+        .init(text: "One small action today compounds silently into the life you want tomorrow.",
+              category: .momentum, source: nil),
+        .init(text: "You don't need a perfect plan. You need a next step — take it.",
+              category: .momentum, source: nil),
+        .init(text: "Momentum is built in the micro. Every tiny win counts.",
+              category: .momentum, source: nil),
+        .init(text: "The hardest part of any day is starting. Once you move, keep moving.",
+              category: .momentum, source: nil),
+        .init(text: "Action dissolves anxiety. The thing you've been avoiding — start there.",
+              category: .momentum, source: nil),
+
+        // FOCUS
+        .init(text: "What you give your attention to grows. Choose what you water today.",
+              category: .focus, source: nil),
+        .init(text: "A life lived with intention beats a busy life every time.",
+              category: .focus, source: nil),
+        .init(text: "Clarity on what matters makes every decision easier.",
+              category: .focus, source: nil),
+        .init(text: "Deep work on the right thing beats scattered effort on everything.",
+              category: .focus, source: nil),
+        .init(text: "Before you check your notifications, check your priorities.",
+              category: .focus, source: nil),
+        .init(text: "Protect your mornings — the first hour shapes the other twenty-three.",
+              category: .focus, source: nil),
+        .init(text: "One meaningful goal pursued with focus beats ten goals pursued with noise.",
+              category: .focus, source: nil),
+
+        // CLARITY
+        .init(text: "Knowing who you're becoming changes how you act today.",
+              category: .clarity, source: nil),
+        .init(text: "The clearer your why, the lighter your how feels.",
+              category: .clarity, source: nil),
+        .init(text: "Uncertainty isn't a problem — it's where every meaningful life begins.",
+              category: .clarity, source: nil),
+        .init(text: "Write it down. An unwritten goal is just a wish.",
+              category: .clarity, source: nil),
+        .init(text: "Reflect often. Progress you can't see is progress you can't build on.",
+              category: .clarity, source: nil),
+        .init(text: "The version of you five years from now is shaped by choices this week.",
+              category: .clarity, source: nil),
+        .init(text: "Slow down to ask the right question. Speed up once you have the answer.",
+              category: .clarity, source: nil),
+
+        // GROWTH
+        .init(text: "Growth is uncomfortable — that's how you know it's real.",
+              category: .growth, source: nil),
+        .init(text: "Every area of your life that's thriving once started exactly where you are now.",
+              category: .growth, source: nil),
+        .init(text: "Level up doesn't mean perfect. It means one notch better than yesterday.",
+              category: .growth, source: nil),
+        .init(text: "You are not behind. You are exactly where your next growth opportunity is.",
+              category: .growth, source: nil),
+        .init(text: "The skill you develop today becomes the advantage you enjoy for years.",
+              category: .growth, source: nil),
+        .init(text: "Learning something hard makes the person doing it stronger — not just smarter.",
+              category: .growth, source: nil),
+        .init(text: "Chase progress in your health, work, and relationships simultaneously — they feed each other.",
+              category: .growth, source: nil),
+
+        // RESILIENCE
+        .init(text: "A missed day isn't failure — it's data. Adjust and continue.",
+              category: .resilience, source: nil),
+        .init(text: "The comeback is always harder than the setback. And always more worth it.",
+              category: .resilience, source: nil),
+        .init(text: "Resistance is highest right before breakthrough. Keep going.",
+              category: .resilience, source: nil),
+        .init(text: "You've already overcome things that seemed impossible. Trust that pattern.",
+              category: .resilience, source: nil),
+        .init(text: "Rest when you need to. Quit never.",
+              category: .resilience, source: nil),
+        .init(text: "Difficult days are not detours — they're part of the path.",
+              category: .resilience, source: nil),
+        .init(text: "Discipline is just caring about your future self enough to act now.",
+              category: .resilience, source: nil),
+
+        // MINDSET
+        .init(text: "Identity shapes action. Act like the person you're becoming — starting today.",
+              category: .mindset, source: nil),
+        .init(text: "Success isn't a destination. It's what happens when your daily actions align with your values.",
+              category: .mindset, source: nil),
+        .init(text: "Don't compare your chapter one to someone else's chapter twenty.",
+              category: .mindset, source: nil),
+        .init(text: "Gratitude for where you are and hunger for where you're going — hold both.",
+              category: .mindset, source: nil),
+        .init(text: "The story you tell yourself about your life is the most powerful one you'll ever hear.",
+              category: .mindset, source: nil),
+        .init(text: "Time is the one resource that doesn't replenish. Spend it like it matters — because it does.",
+              category: .mindset, source: nil),
+        .init(text: "Execution is the difference between the life you imagine and the life you live.",
+              category: .mindset, source: nil),
+    ]
 }
 
 // ============================================================

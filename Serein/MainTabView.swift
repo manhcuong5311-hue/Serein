@@ -11,9 +11,11 @@
 //   Settings    — gear       — preferences
 
 import SwiftUI
+import StoreKit
 
 struct MainTabView: View {
     @EnvironmentObject var appState: AppState
+    @Environment(\.requestReview) private var requestReview
     @State private var selectedTab: Int = 0
     @State private var showReflection: Bool = false
 
@@ -23,7 +25,10 @@ struct MainTabView: View {
             // ── Tab 0: Dashboard ──────────────────────────────
             NavigationStack {
                 LifeDashboardView(
-                    onGoToGoals:      { selectedTab = 1 },
+                    onGoToGoals: { areaId in
+                        appState.dashboardFocusAreaId = areaId
+                        selectedTab = 1
+                    },
                     onGoToReflection: { showReflection = true },
                     onGoToVision:     { selectedTab = 3 }
                 )
@@ -71,7 +76,7 @@ struct MainTabView: View {
             .tag(4)
         }
         .tint(Color.lcPrimary)
-        .preferredColorScheme(.dark)
+
         // Weekly reflection sheet — triggered from Dashboard or streak prompt
         .sheet(isPresented: $showReflection) {
             WeeklyReflectionView(
@@ -85,6 +90,12 @@ struct MainTabView: View {
         .onChange(of: appState.shouldShowReflectionPrompt) { _, show in
             // Could auto-open here if desired; currently user-initiated via Dashboard card
             _ = show
+        }
+        // App Store review — fires once, after first step is saved
+        .onChange(of: appState.shouldRequestReview) { _, should in
+            guard should else { return }
+            requestReview()
+            appState.shouldRequestReview = false
         }
     }
 }
