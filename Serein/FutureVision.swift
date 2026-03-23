@@ -74,7 +74,7 @@ struct FutureVisionArea: Identifiable, Codable, Hashable {
 // MARK: - Future Vision
 // ============================================================
 
-struct FutureVision: Codable {
+struct FutureVision: Codable, Equatable {
     var targetAge:  Int
     var narrative:  String
     var areas:      [FutureVisionArea]

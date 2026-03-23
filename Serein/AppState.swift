@@ -93,7 +93,7 @@ final class AppState: ObservableObject {
             return updated
         }
 
-        goals           = Goal.loadPersisted() ?? Goal.samples
+        goals           = Goal.loadPersisted() ?? []
         reflections     = WeeklyReflection.loadAll()
         dailyActivities = DailyActivity.loadAll()
         futureVision    = FutureVision.load()
@@ -327,7 +327,7 @@ final class AppState: ObservableObject {
     func resetAllData() {
         userProfile     = nil
         lifeAreas       = LifeArea.samples
-        goals           = Goal.samples
+        goals           = []
         reflections     = []
         dailyActivities = []
         futureVision    = .placeholder
@@ -335,7 +335,8 @@ final class AppState: ObservableObject {
 
         let keys = ["lc.goals", "lc.dailyActivities",
                     "lc.futureVision", "lc.reflections",
-                    DailyManager.lastActiveDateKey]
+                    DailyManager.lastActiveDateKey,
+                    "lc.reminderEnabled", "lc.morningEnabled", "lc.eveningEnabled"]
         keys.forEach { UserDefaults.standard.removeObject(forKey: $0) }
         LifeArea.clearProgress()
         UserProfile.delete()
@@ -351,6 +352,13 @@ final class AppState: ObservableObject {
 
     func area(for goal: Goal) -> LifeArea? {
         lifeAreas.first { $0.id == goal.lifeAreaId }
+    }
+
+    /// Records step completion XP for GoalDetailView's local step toggles.
+    /// Use this instead of recordMilestoneCompletion so completedStepCount is correct.
+    func recordStepActivity(goalId: UUID, stepId: UUID) {
+        guard let goal = goals.first(where: { $0.id == goalId }) else { return }
+        recordStepCompletion(xp: 25, lifeAreaId: goal.lifeAreaId)
     }
 
     var activeGoalsCount: Int {

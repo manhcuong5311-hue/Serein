@@ -96,7 +96,8 @@ struct LifeDashboardView: View {
                 goal: item.goal,
                 area: item.area,
                 onGoalUpdated:        { appState.updateGoal($0) },
-                onMilestoneCompleted: { xp, areaId in appState.recordMilestoneCompletion(xp: xp, lifeAreaId: areaId) }
+                onMilestoneCompleted: { xp, areaId in appState.recordMilestoneCompletion(xp: xp, lifeAreaId: areaId) },
+                onStepCompleted:      { goalId, stepId in appState.recordStepActivity(goalId: goalId, stepId: stepId) }
             )
         }
         .animation(.lcSoftAppear, value: appState.shouldShowReflectionPrompt)

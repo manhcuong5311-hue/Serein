@@ -77,16 +77,19 @@ final class SettingsViewModel: ObservableObject {
         notificationStatus = settings.authorizationStatus
     }
 
-    func requestNotificationPermission() async {
+    /// Requests notification permission and returns whether it was granted.
+    /// Does not schedule anything — callers decide what to schedule after.
+    @discardableResult
+    func requestNotificationPermission() async -> Bool {
         do {
             let granted = try await UNUserNotificationCenter.current()
                 .requestAuthorization(options: [.alert, .sound, .badge])
-            if granted {
-                reminderEnabled = true
-                scheduleReflectionReminder()
-            }
-        } catch {}
-        await checkNotificationStatus()
+            await checkNotificationStatus()
+            return granted
+        } catch {
+            await checkNotificationStatus()
+            return false
+        }
     }
 
     func toggleReminder(_ enabled: Bool) {
@@ -95,7 +98,12 @@ final class SettingsViewModel: ObservableObject {
                 reminderEnabled = true
                 scheduleReflectionReminder()
             } else if notificationStatus == .notDetermined {
-                Task { await requestNotificationPermission() }
+                Task {
+                    if await requestNotificationPermission() {
+                        reminderEnabled = true
+                        scheduleReflectionReminder()
+                    }
+                }
             }
             // .denied → user must go to iOS Settings; toggle stays off
         } else {
@@ -112,7 +120,12 @@ final class SettingsViewModel: ObservableObject {
                 morningEnabled = true
                 scheduleMorningReminder()
             } else if notificationStatus == .notDetermined {
-                Task { await requestNotificationPermission() }
+                Task {
+                    if await requestNotificationPermission() {
+                        morningEnabled = true
+                        scheduleMorningReminder()
+                    }
+                }
             }
         } else {
             morningEnabled = false
@@ -128,7 +141,12 @@ final class SettingsViewModel: ObservableObject {
                 eveningEnabled = true
                 scheduleEveningReminder()
             } else if notificationStatus == .notDetermined {
-                Task { await requestNotificationPermission() }
+                Task {
+                    if await requestNotificationPermission() {
+                        eveningEnabled = true
+                        scheduleEveningReminder()
+                    }
+                }
             }
         } else {
             eveningEnabled = false
@@ -280,7 +298,7 @@ struct SettingsView: View {
             }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("This clears your future vision, reflections, daily activity, and settings. Goals are reset to samples.")
+            Text("This clears your goals, future vision, reflections, daily activity, and all settings. This cannot be undone.")
         }
         .alert(
             vm.restoreSucceeded ? "Purchase Restored" : "Nothing to Restore",

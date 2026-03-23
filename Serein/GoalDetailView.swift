@@ -53,7 +53,8 @@ final class GoalDetailViewModel: ObservableObject {
     @Published var showEditGoal:   Bool       = false
 
     var onGoalUpdated:        (Goal)          -> Void
-    var onMilestoneCompleted: (Double, UUID)  -> Void   // xp, lifeAreaId
+    var onMilestoneCompleted: (Double, UUID)  -> Void   // xp, lifeAreaId (milestone)
+    var onStepCompleted:      (UUID, UUID)    -> Void   // goalId, stepId
 
     private let lifeAreaId:        UUID
     private var sessionCompletions = 0
@@ -63,12 +64,14 @@ final class GoalDetailViewModel: ObservableObject {
         goal:                Goal,
         lifeAreaId:          UUID,
         onGoalUpdated:        @escaping (Goal)         -> Void,
-        onMilestoneCompleted: @escaping (Double, UUID) -> Void = { _, _ in }
+        onMilestoneCompleted: @escaping (Double, UUID) -> Void = { _, _ in },
+        onStepCompleted:      @escaping (UUID, UUID)   -> Void = { _, _ in }
     ) {
         self.goal                = goal
         self.lifeAreaId          = lifeAreaId
         self.onGoalUpdated        = onGoalUpdated
         self.onMilestoneCompleted = onMilestoneCompleted
+        self.onStepCompleted      = onStepCompleted
         self.showCelebration      = goal.isComplete
     }
 
@@ -108,8 +111,7 @@ final class GoalDetailViewModel: ObservableObject {
 
         if !wasCompleted {
             sessionCompletions += 1
-            // Award 25 XP per step completion
-            onMilestoneCompleted(25, lifeAreaId)
+            onStepCompleted(goal.id, id)
             flashFeedback(motivationalMessages.randomElement() ?? "Step completed")
             if sessionCompletions >= 3 && momentumMessage == nil {
                 withAnimation(.lcSoftAppear.delay(0.4)) {
@@ -248,6 +250,7 @@ struct GoalDetailView: View {
     let area: LifeArea
     var onGoalUpdated:        (Goal)         -> Void
     var onMilestoneCompleted: (Double, UUID) -> Void
+    var onStepCompleted:      (UUID, UUID)   -> Void   // goalId, stepId
 
     @StateObject private var vm: GoalDetailViewModel
     @Environment(\.dismiss) private var dismiss
@@ -256,16 +259,19 @@ struct GoalDetailView: View {
         goal:                Goal,
         area:                LifeArea,
         onGoalUpdated:        @escaping (Goal)         -> Void,
-        onMilestoneCompleted: @escaping (Double, UUID) -> Void = { _, _ in }
+        onMilestoneCompleted: @escaping (Double, UUID) -> Void = { _, _ in },
+        onStepCompleted:      @escaping (UUID, UUID)   -> Void = { _, _ in }
     ) {
         self.area                = area
         self.onGoalUpdated        = onGoalUpdated
         self.onMilestoneCompleted = onMilestoneCompleted
+        self.onStepCompleted      = onStepCompleted
         _vm = StateObject(wrappedValue: GoalDetailViewModel(
             goal:                goal,
             lifeAreaId:          area.id,
             onGoalUpdated:        onGoalUpdated,
-            onMilestoneCompleted: onMilestoneCompleted
+            onMilestoneCompleted: onMilestoneCompleted,
+            onStepCompleted:      onStepCompleted
         ))
     }
 

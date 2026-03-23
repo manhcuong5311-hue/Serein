@@ -91,37 +91,37 @@ extension LifeArea {
             id: LifeAreaID.health, title: "Health",
             icon: "heart.fill",
             accent: .lcGold,
-            level: 14, currentXP: 3_200, maxXP: 5_000
+            level: 1, currentXP: 0, maxXP: 1_200
         ),
         LifeArea(
             id: LifeAreaID.career, title: "Career",
             icon: "briefcase.fill",
             accent: .lcPrimary,
-            level: 9, currentXP: 1_800, maxXP: 4_000
+            level: 1, currentXP: 0, maxXP: 1_200
         ),
         LifeArea(
             id: LifeAreaID.relationships, title: "Relationships",
             icon: "person.2.fill",
             accent: .lcLavender,
-            level: 11, currentXP: 2_600, maxXP: 4_500
+            level: 1, currentXP: 0, maxXP: 1_200
         ),
         LifeArea(
             id: LifeAreaID.mindfulness, title: "Mindfulness",
             icon: "leaf.fill",
             accent: Color(lcHex: "#7DB6A0"),
-            level: 7, currentXP: 900, maxXP: 3_000
+            level: 1, currentXP: 0, maxXP: 1_200
         ),
         LifeArea(
             id: LifeAreaID.creativity, title: "Creativity",
             icon: "paintbrush.fill",
             accent: .lcBeige,
-            level: 5, currentXP: 400, maxXP: 2_500
+            level: 1, currentXP: 0, maxXP: 1_200
         ),
         LifeArea(
             id: LifeAreaID.finances, title: "Finances",
             icon: "chart.line.uptrend.xyaxis",
             accent: Color(lcHex: "#C4856A"),
-            level: 6, currentXP: 1_100, maxXP: 3_000
+            level: 1, currentXP: 0, maxXP: 1_200
         ),
     ]
 }

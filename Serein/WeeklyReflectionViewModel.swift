@@ -103,30 +103,4 @@ final class WeeklyReflectionViewModel: ObservableObject {
         phase      = .writing
     }
 
-    // ── Weekly Reminder ───────────────────────────────────────
-
-    func scheduleWeeklyReminder() {
-        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { granted, _ in
-            guard granted else { return }
-
-            let content   = UNMutableNotificationContent()
-            content.title = "Time to reflect"
-            content.body  = "A few quiet minutes now shapes the week ahead."
-            content.sound = .default
-
-            var comps      = DateComponents()
-            comps.weekday  = 1      // Sunday
-            comps.hour     = 20
-            comps.minute   = 0
-
-            let trigger = UNCalendarNotificationTrigger(dateMatching: comps, repeats: true)
-            let request = UNNotificationRequest(
-                identifier: "lc.weekly.reflection",
-                content:    content,
-                trigger:    trigger
-            )
-
-            UNUserNotificationCenter.current().add(request)
-        }
-    }
 }

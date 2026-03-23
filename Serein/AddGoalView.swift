@@ -15,12 +15,15 @@ struct AddGoalView: View {
     @EnvironmentObject var appState: AppState
     @Environment(\.dismiss) private var dismiss
 
+    @ObservedObject private var access = FeatureAccessManager.shared
+
     @State private var selectedAreaId:  UUID?   = nil
     @State private var goalTitle:       String  = ""
     @State private var goalWhy:         String  = ""
     @State private var milestoneTitle:  String  = ""
     @State private var xpReward:        Double  = 300
     @State private var isSaving:        Bool    = false
+    @State private var showPremium:     Bool    = false
 
     @FocusState private var focusedField: Field?
     enum Field { case title, why, milestone }
@@ -86,13 +89,21 @@ struct AddGoalView: View {
             }
             .scrollDismissesKeyboard(.interactively)
         }
-
+        .sheet(isPresented: $showPremium) {
+            PremiumView()
+                .presentationDragIndicator(.visible)
+                .presentationDetents([.large])
+        }
     }
 
     // ── Save ──────────────────────────────────────────────────
 
     private func save() {
         guard let areaId = selectedAreaId else { return }
+        guard access.canAddGoal(in: areaId, goals: appState.goals) else {
+            showPremium = true
+            return
+        }
         isSaving = true
 
         let trimmedTitle     = goalTitle.trimmingCharacters(in: .whitespaces)

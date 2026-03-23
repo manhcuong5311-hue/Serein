@@ -51,12 +51,12 @@ struct LifeMapView: View {
                 )
             }
         }
-        .onChange(of: appState.futureVision.narrative) { _, _ in
+        .onChange(of: appState.futureVision) { _, newVision in
             Task {
                 await vm.refresh(
                     goals:  appState.goals,
                     areas:  appState.lifeAreas,
-                    vision: appState.futureVision
+                    vision: newVision
                 )
             }
         }
